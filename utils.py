@@ -14,6 +14,7 @@ from torchvision.datasets import STL10
 from torchvision.datasets import ImageFolder
 
 import ws_resnet
+from aisi_joints.vicreg.data import JointDataset
 from model_params import ModelParams
 
 ###################
@@ -104,7 +105,7 @@ class DatasetBase:
     @property
     def data_path(self):
         pathstr = os.environ.get("DATA_PATH", os.getcwd())
-        os.makedirs(pathstr, exist_ok=True)
+        # os.makedirs(pathstr, exist_ok=True)
         return pathstr
 
     @property
@@ -194,6 +195,26 @@ class CIFAR10Dataset(DatasetBase):
         return CIFAR10(self.data_path, train=False, download=True, transform=self.transform_test)
 
 
+aisi_default_transform = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225]),
+    ]
+)
+
+
+@attr.s(auto_attribs=True, slots=True)
+class AISIDataset(DatasetBase):
+    transform_train: Callable[[Any], torch.Tensor] = aisi_default_transform
+    transform_test: Callable[[Any], torch.Tensor] = aisi_default_transform
+
+    def configure_train(self):
+        return JointDataset.from_csv(self.data_path, random_crop=True, crop_width=256, crop_height=256, transform=self.transform_train)
+
+    def configure_validation(self):
+        return JointDataset.from_csv(self.data_path, random_crop=False, crop_width=256, crop_height=256, transform=self.transform_test)
+
+
 def get_moco_dataset(hparams: ModelParams) -> DatasetBase:
     if hparams.dataset_name == "stl10":
         crop_size = 96
@@ -228,8 +249,20 @@ def get_moco_dataset(hparams: ModelParams) -> DatasetBase:
         return CIFAR10Dataset(
             transform_train=transforms.split_transform, transform_test=transforms.get_test_transform()
         )
+    elif hparams.dataset_name == 'aisi':
+        crop_size = 256
+        resize = 256
+
+        normalize_means = [0.485, 0.456, 0.406]
+        normalize_stds = [0.228, 0.224, 0.225]
+        transforms = MoCoTransforms(
+            crop_size, resize, normalize_means, normalize_stds, hparams.transform_s, hparams.transform_apply_blur
+        )
+        return AISIDataset(
+            transform_train=transforms.split_transform, transform_test=transforms.get_test_transform()
+        )
     else:
-        raise NotImplementedError(f"Dataset {name} not defined")
+        raise NotImplementedError(f"Dataset {hparams.dataset_name} not defined")
 
 
 def get_class_transforms(crop_size, resize):
