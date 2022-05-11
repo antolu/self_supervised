@@ -209,10 +209,10 @@ class AISIDataset(DatasetBase):
     transform_test: Callable[[Any], torch.Tensor] = aisi_default_transform
 
     def configure_train(self):
-        return JointDataset.from_csv(self.data_path, random_crop=True, crop_width=256, crop_height=256, transform=self.transform_train)
+        return JointDataset.from_csv(self.data_path, random_crop=True, crop_width=299, crop_height=299, transform=self.transform_train)
 
     def configure_validation(self):
-        return JointDataset.from_csv(self.data_path, random_crop=False, crop_width=256, crop_height=256, transform=self.transform_test)
+        return JointDataset.from_csv(self.data_path, random_crop=False, crop_width=299, crop_height=299, transform=self.transform_test)
 
 
 def get_moco_dataset(hparams: ModelParams) -> DatasetBase:
@@ -250,11 +250,11 @@ def get_moco_dataset(hparams: ModelParams) -> DatasetBase:
             transform_train=transforms.split_transform, transform_test=transforms.get_test_transform()
         )
     elif hparams.dataset_name == 'aisi':
-        crop_size = 256
+        crop_size = 224
         resize = 256
 
-        normalize_means = [0.485, 0.456, 0.406]
-        normalize_stds = [0.228, 0.224, 0.225]
+        normalize_means = [0.28513786, 0.28513786, 0.28513786]
+        normalize_stds = [0.21466085, 0.21466085, 0.21466085]
         transforms = MoCoTransforms(
             crop_size, resize, normalize_means, normalize_stds, hparams.transform_s, hparams.transform_apply_blur
         )
