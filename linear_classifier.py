@@ -76,27 +76,27 @@ class LinearClassifierMethod(pl.LightningModule):
         x, y = batch
         y_hat = self.forward(x)
         loss = F.cross_entropy(y_hat, y)
-        acc1, acc5 = utils.calculate_accuracy(y_hat, y, topk=(1, 2))
+        acc1 = utils.calculate_accuracy(y_hat, y, topk=(1,))
 
-        log_data = {"step_train_loss": loss, "step_train_acc1": acc1, "step_train_acc5": acc5}
+        log_data = {"step_train_loss": loss, "step_train_acc1": acc1[0]}
         return {"loss": loss, "log": log_data}
 
     def validation_step(self, batch, batch_idx, **kwargs):
         x, y = batch
         y_hat = self.forward(x)
-        acc1, acc5 = utils.calculate_accuracy(y_hat, y, topk=(1, 2))
+        acc1 = utils.calculate_accuracy(y_hat, y, topk=(1,))
         return {
             "valid_loss": F.cross_entropy(y_hat, y),
-            "valid_acc1": acc1,
-            "valid_acc5": acc5,
+            "valid_acc1": acc1[0],
+            # "valid_acc5": acc5,
         }
 
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["valid_loss"] for x in outputs]).mean()
         avg_acc1 = torch.stack([x["valid_acc1"] for x in outputs]).mean()
-        avg_acc5 = torch.stack([x["valid_acc5"] for x in outputs]).mean()
+        # avg_acc5 = torch.stack([x["valid_acc5"] for x in outputs]).mean()
 
-        log_data = {"valid_loss": avg_loss, "valid_acc1": avg_acc1, "valid_acc5": avg_acc5}
+        log_data = {"valid_loss": avg_loss, "valid_acc1": avg_acc1}
         print(log_data)
         return {
             "val_loss": avg_loss,
