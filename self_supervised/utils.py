@@ -14,7 +14,7 @@ from torchvision.datasets import STL10
 from torchvision.datasets import ImageFolder
 
 from . import ws_resnet
-from aisi_joints.vicreg.data import JointDataset
+from aisi_joints.self_supervised.data import JointDataset
 from .model_params import ModelParams
 
 ###################

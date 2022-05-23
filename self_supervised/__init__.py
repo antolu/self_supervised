@@ -1,5 +1,4 @@
-import utils
-
+from . import utils
 from .linear_classifier import LinearClassifierMethod
 from .linear_classifier import LinearClassifierMethodParams
 from .moco import SelfSupervisedMethod

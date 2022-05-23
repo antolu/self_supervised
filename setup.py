@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from os import path
 
 HERE = path.split(path.abspath(__file__))[0]
@@ -12,4 +12,4 @@ with open(path.join(HERE, 'requirements.txt'), 'r') as f:
             requirements.append(line.strip())
 
 
-setup(install_requires=requirements)
+setup(install_requires=requirements, packages=find_packages())
