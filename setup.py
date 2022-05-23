@@ -12,4 +12,8 @@ with open(path.join(HERE, 'requirements.txt'), 'r') as f:
             requirements.append(line.strip())
 
 
-setup(install_requires=requirements, packages=find_packages())
+setup(name='self_supervised',
+      install_requires=requirements,
+      packages=find_packages(),
+      version='0.1'
+)
