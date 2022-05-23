@@ -209,10 +209,10 @@ class AISIDataset(DatasetBase):
     transform_test: Callable[[Any], torch.Tensor] = aisi_default_transform
 
     def configure_train(self):
-        return JointDataset.from_csv(self.data_path, random_crop=True, crop_width=299, crop_height=299, transform=self.transform_train)
+        return JointDataset.from_csv(self.data_path, split='train', random_crop=True, crop_width=299, crop_height=299, transform=self.transform_train)
 
     def configure_validation(self):
-        return JointDataset.from_csv(self.data_path, random_crop=False, crop_width=299, crop_height=299, transform=self.transform_test)
+        return JointDataset.from_csv(self.data_path, split='validation', random_crop=False, crop_width=299, crop_height=299, transform=self.transform_test)
 
 
 def get_moco_dataset(hparams: ModelParams) -> DatasetBase:
@@ -251,7 +251,7 @@ def get_moco_dataset(hparams: ModelParams) -> DatasetBase:
         )
     elif hparams.dataset_name == 'aisi':
         crop_size = 224
-        resize = 256
+        resize = 224
 
         normalize_means = [0.28513786, 0.28513786, 0.28513786]
         normalize_stds = [0.21466085, 0.21466085, 0.21466085]
@@ -286,6 +286,10 @@ def get_class_dataset(name: str) -> DatasetBase:
     elif name == "cifar10":
         transform_train, transform_test = get_class_transforms(32, 36)
         return CIFAR10Dataset(transform_train=transform_train, transform_test=transform_test)
+    elif name == 'aisi':
+        transform_train, transform_test = get_class_transforms(224, 256)
+        return AISIDataset(transform_train=transform_train,
+                           transform_test=transform_test)
     raise NotImplementedError(f"Dataset {name} not defined")
 
 

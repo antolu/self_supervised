@@ -50,10 +50,10 @@ class LinearClassifierMethod(pl.LightningModule):
         elif isinstance(hparams, dict):
             hparams = self.params(**hparams, **kwargs)
 
-        self.hparams = AttributeDict(attr.asdict(hparams))
+        self.hparams.update(attr.asdict(hparams))
 
         # actually do a load that is a little more flexible
-        self.model = utils.get_encoder(hparams.encoder_arch)
+        self.model = utils.get_encoder(hparams.encoder_arch, hparams.dataset_name)
 
         self.dataset = utils.get_class_dataset(hparams.dataset_name)
 
@@ -76,7 +76,7 @@ class LinearClassifierMethod(pl.LightningModule):
         x, y = batch
         y_hat = self.forward(x)
         loss = F.cross_entropy(y_hat, y)
-        acc1, acc5 = utils.calculate_accuracy(y_hat, y, topk=(1, 5))
+        acc1, acc5 = utils.calculate_accuracy(y_hat, y, topk=(1, 2))
 
         log_data = {"step_train_loss": loss, "step_train_acc1": acc1, "step_train_acc5": acc5}
         return {"loss": loss, "log": log_data}
@@ -84,7 +84,7 @@ class LinearClassifierMethod(pl.LightningModule):
     def validation_step(self, batch, batch_idx, **kwargs):
         x, y = batch
         y_hat = self.forward(x)
-        acc1, acc5 = utils.calculate_accuracy(y_hat, y, topk=(1, 5))
+        acc1, acc5 = utils.calculate_accuracy(y_hat, y, topk=(1, 2))
         return {
             "valid_loss": F.cross_entropy(y_hat, y),
             "valid_acc1": acc1,
