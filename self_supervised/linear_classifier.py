@@ -32,6 +32,8 @@ class LinearClassifierMethodParams:
     pin_data_memory: bool = True
     multi_gpu_training: bool = False
 
+    pretrained: bool = False
+
 
 class LinearClassifierMethod(pl.LightningModule):
     model: torch.nn.Module
@@ -53,7 +55,9 @@ class LinearClassifierMethod(pl.LightningModule):
         self.hparams.update(attr.asdict(hparams))
 
         # actually do a load that is a little more flexible
-        self.model = utils.get_encoder(hparams.encoder_arch, hparams.dataset_name)
+        self.model = utils.get_encoder(hparams.encoder_arch,
+                                       hparams.dataset_name,
+                                       hparams.pretrained)
 
         self.dataset = utils.get_class_dataset(hparams.dataset_name)
 

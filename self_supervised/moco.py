@@ -76,7 +76,9 @@ class SelfSupervisedMethod(pl.LightningModule):
             warnings.warn("Configuration suspicious: cross entropy loss without negative examples")
 
         # Create encoder model
-        self.model = utils.get_encoder(hparams.encoder_arch, hparams.dataset_name)
+        self.model = utils.get_encoder(hparams.encoder_arch,
+                                       hparams.dataset_name,
+                                       hparams.pretrained)
 
         # Create dataset
         self.dataset = utils.get_moco_dataset(hparams)

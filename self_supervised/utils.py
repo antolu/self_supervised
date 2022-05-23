@@ -1,6 +1,6 @@
 import os
 import random
-from typing import Any
+from typing import Any, List
 from typing import Callable
 from typing import Optional
 
@@ -265,13 +265,30 @@ def get_moco_dataset(hparams: ModelParams) -> DatasetBase:
         raise NotImplementedError(f"Dataset {hparams.dataset_name} not defined")
 
 
-def get_class_transforms(crop_size, resize):
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+def get_class_transforms(crop_size: int, resize: int,
+                         mean: Optional[List[float]] = None,
+                         std: Optional[List[float]] = None):
+    if mean is None:
+        mean = [0.485, 0.456, 0.406]
+    if std is None:
+        std = [0.229, 0.224, 0.225]
+
+    normalize = transforms.Normalize(mean=mean, std=std)
     transform_train = transforms.Compose(
-        [transforms.RandomResizedCrop(crop_size), transforms.RandomHorizontalFlip(), transforms.ToTensor(), normalize]
+        [
+            transforms.RandomResizedCrop(crop_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize
+        ]
     )
     transform_test = transforms.Compose(
-        [transforms.Resize(resize), transforms.CenterCrop(crop_size), transforms.ToTensor(), normalize]
+        [
+            transforms.Resize(resize),
+            transforms.CenterCrop(crop_size),
+            transforms.ToTensor(),
+            normalize
+        ]
     )
     return transform_train, transform_test
 
@@ -287,7 +304,12 @@ def get_class_dataset(name: str) -> DatasetBase:
         transform_train, transform_test = get_class_transforms(32, 36)
         return CIFAR10Dataset(transform_train=transform_train, transform_test=transform_test)
     elif name == 'aisi':
-        transform_train, transform_test = get_class_transforms(224, 256)
+        normalize_means = [0.28513786, 0.28513786, 0.28513786]
+        normalize_stds = [0.21466085, 0.21466085, 0.21466085]
+
+        transform_train, transform_test = get_class_transforms(
+            224, 256, normalize_means, normalize_stds)
+
         return AISIDataset(transform_train=transform_train,
                            transform_test=transform_test)
     raise NotImplementedError(f"Dataset {name} not defined")
@@ -403,7 +425,8 @@ class MLP(torch.nn.Module):
         return self.net(x)
 
 
-def get_encoder(name: str, dataset: str, **kwargs) -> torch.nn.Module:
+def get_encoder(name: str, dataset: str, pretrained: bool = False,
+                **kwargs) -> torch.nn.Module:
     """
     Gets just the encoder portion of a torchvision model (replaces final layer with identity)
     :param name: (str) name of the model
@@ -420,7 +443,7 @@ def get_encoder(name: str, dataset: str, **kwargs) -> torch.nn.Module:
         raise AttributeError(f"Unknown architecture {name}")
 
     assert model_creator is not None, f"no torchvision model named {name}"
-    model = model_creator(**kwargs)
+    model = model_creator(**kwargs, pretrained=pretrained)
     if hasattr(model, "fc"):
         model.fc = torch.nn.Identity()
         if dataset == "cifar10":

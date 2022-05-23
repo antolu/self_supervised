@@ -73,6 +73,8 @@ class ModelParams:
     pin_data_memory: bool = True
     gather_keys_for_queue: bool = False
 
+    pretrained: bool = False
+
 
 # Differences between these parameters and those used in the paper (on image net):
 # max_epochs=1000,
