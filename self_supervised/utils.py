@@ -13,9 +13,9 @@ from torchvision.datasets import CIFAR10
 from torchvision.datasets import STL10
 from torchvision.datasets import ImageFolder
 
-import ws_resnet
+from . import ws_resnet
 from aisi_joints.vicreg.data import JointDataset
-from model_params import ModelParams
+from .model_params import ModelParams
 
 ###################
 # Transform utils #

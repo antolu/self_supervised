@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from pytorch_lightning.utilities import AttributeDict
 from torch.utils.data import DataLoader
 
-import utils
+from . import utils
 
 
 @attr.s(auto_attribs=True)

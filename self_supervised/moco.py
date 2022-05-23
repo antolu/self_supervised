@@ -11,12 +11,12 @@ import torch
 import torch.nn.functional as F
 from pytorch_lightning.utilities import AttributeDict
 from torch.utils.data import DataLoader
-
-import utils
-from batchrenorm import BatchRenorm1d
-from lars import LARS
-from model_params import ModelParams
 from sklearn.linear_model import LogisticRegression
+
+from . import utils
+from .batchrenorm import BatchRenorm1d
+from .lars import LARS
+from .model_params import ModelParams
 
 
 def get_mlp_normalization(hparams: ModelParams, prediction=False):
