@@ -101,7 +101,7 @@ class LinearClassifierMethod(pl.LightningModule):
         # avg_acc5 = torch.stack([x["valid_acc5"] for x in outputs]).mean()
 
         log_data = {"valid_loss": avg_loss, "valid_acc1": avg_acc1}
-        print(log_data)
+        self.log_dict(log_data)
         return {
             "val_loss": avg_loss,
             "log": log_data,
