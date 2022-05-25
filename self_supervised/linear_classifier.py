@@ -111,7 +111,7 @@ class LinearClassifierMethod(pl.LightningModule):
         for cls, data in {k: v
                           for k, v in report.items()
                           if k not in ('accuracy', 'macro avg', 'weighted_avg')
-                          }:
+                          }.items():
             report_data[f'{cls}_precision'] = data['precision']
             report_data[f'{cls}_recall'] = data['recall']
 
