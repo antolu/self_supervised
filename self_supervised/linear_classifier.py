@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 from pytorch_lightning.utilities import AttributeDict
 from torch.utils.data import DataLoader
+from sklearn.metrics import classification_report
 
 from . import utils
 
@@ -83,6 +84,7 @@ class LinearClassifierMethod(pl.LightningModule):
         acc1 = utils.calculate_accuracy(y_hat, y, topk=(1,))
 
         log_data = {"step_train_loss": loss, "step_train_acc1": acc1[0]}
+        self.log_dict(log_data)
         return {"loss": loss, "log": log_data}
 
     def validation_step(self, batch, batch_idx, **kwargs):
@@ -92,16 +94,30 @@ class LinearClassifierMethod(pl.LightningModule):
         return {
             "valid_loss": F.cross_entropy(y_hat, y),
             "valid_acc1": acc1[0],
+            'predictions': torch.max(y_hat, dim=1)[1],
+            'labels': y,
             # "valid_acc5": acc5,
         }
 
     def validation_epoch_end(self, outputs):
         avg_loss = torch.stack([x["valid_loss"] for x in outputs]).mean()
         avg_acc1 = torch.stack([x["valid_acc1"] for x in outputs]).mean()
+        labels = torch.cat([x['labels'] for x in outputs]).cpu().numpy()
+        predictions = torch.cat([x['predictions'] for x in outputs]).cpu().numpy()
         # avg_acc5 = torch.stack([x["valid_acc5"] for x in outputs]).mean()
 
+        report = classification_report(labels, predictions, output_dict=True)
+        report_data = {}
+        for cls, data in {k: v
+                          for k, v in report.items()
+                          if k not in ('accuracy', 'macro avg', 'weighted_avg')
+                          }:
+            report_data[f'{cls}_precision'] = data['precision']
+            report_data[f'{cls}_recall'] = data['recall']
+
         log_data = {"valid_loss": avg_loss, "valid_acc1": avg_acc1}
-        self.log_dict(log_data)
+        self.log_dict(log_data, prog_bar=True)
+        self.log_dict(report_data)
         return {
             "val_loss": avg_loss,
             "log": log_data,

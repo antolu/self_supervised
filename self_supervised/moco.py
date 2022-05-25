@@ -338,8 +338,12 @@ class SelfSupervisedMethod(pl.LightningModule):
             "T": self._get_temp(),
             "m": self._get_m(),
         }
-        print(f"Epoch {self.current_epoch} accuracy: train: {train_accuracy:.1f}%, validation: {valid_accuracy:.1f}%")
+        log_data_prog = {
+            'train_acc': train_accuracy,
+            'val_acc': valid_accuracy,
+        }
         self.log_dict(log_data)
+        self.log_dict(log_data_prog, prog_bar=True, logger=False)
 
     def configure_optimizers(self):
         # exclude bias and batch norm from LARS and weight decay
