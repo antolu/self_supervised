@@ -8,6 +8,7 @@ import attr
 import torch
 import torchvision
 from PIL import ImageFilter
+import timm
 from torchvision import transforms
 from torchvision.datasets import CIFAR10
 from torchvision.datasets import STL10
@@ -439,11 +440,16 @@ def get_encoder(name: str, dataset: str, pretrained: bool = False,
         model_creator = ws_resnet.__dict__.get(name)
     elif name in torchvision.models.__dict__:
         model_creator = torchvision.models.__dict__.get(name)
+    elif name == 'inception_resnet_v2':
+        pass
     else:
         raise AttributeError(f"Unknown architecture {name}")
 
-    assert model_creator is not None, f"no torchvision model named {name}"
-    model = model_creator(**kwargs, pretrained=pretrained)
+    if name == 'inception_resnet_v2':
+        model = timm.create_model('inception_resnet_v2', pretrained=pretrained)
+    else:
+        assert model_creator is not None, f"no torchvision model named {name}"
+        model = model_creator(**kwargs, pretrained=pretrained)
     if hasattr(model, "fc"):
         model.fc = torch.nn.Identity()
         if dataset == "cifar10":
@@ -451,6 +457,8 @@ def get_encoder(name: str, dataset: str, pretrained: bool = False,
             model.maxpool = torch.nn.Identity()
     elif hasattr(model, "classifier"):
         model.classifier = torch.nn.Identity()
+    elif hasattr(model, 'classif'):
+        model.classif = torch.nn.Identity()
     else:
         raise NotImplementedError(f"Unknown class {model.__class__}")
 
