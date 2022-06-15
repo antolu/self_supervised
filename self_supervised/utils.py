@@ -210,7 +210,7 @@ class AISIDataset(DatasetBase):
     transform_test: Callable[[Any], torch.Tensor] = aisi_default_transform
 
     def configure_train(self):
-        return JointDataset.from_csv(self.data_path, split='train', random_crop=False, crop_width=299, crop_height=299, transform=self.transform_train)
+        return JointDataset.from_csv(self.data_path, split='train', random_crop=True, crop_width=299, crop_height=299, transform=self.transform_train)
 
     def configure_validation(self):
         return JointDataset.from_csv(self.data_path, split='validation', random_crop=False, crop_width=299, crop_height=299, transform=self.transform_test)
