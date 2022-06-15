@@ -215,6 +215,9 @@ class AISIDataset(DatasetBase):
     def configure_validation(self):
         return JointDataset.from_csv(self.data_path, split='validation', random_crop=False, crop_width=299, crop_height=299, transform=self.transform_test)
 
+    def configure_test(self):
+        return JointDataset.from_csv(self.data_path, split='test', random_crop=False, crop_width=299, crop_height=299, transform=self.transform_test)
+
 
 def get_moco_dataset(hparams: ModelParams) -> DatasetBase:
     if hparams.dataset_name == "stl10":
