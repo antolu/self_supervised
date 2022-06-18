@@ -394,11 +394,13 @@ class BatchShuffleDDP:
 
 
 class MLP(torch.nn.Module):
-    def __init__(
-        self, input_dim, output_dim, hidden_dim, num_layers, weight_standardization=False, normalization=None
-    ):
+    def __init__(self, input_dim: int, output_dim: int, hidden_dim: int,
+                 num_layers: int, dropout: float = 1.0,
+                 weight_standardization: bool = False,
+                 normalization: Callable = None):
         super().__init__()
         assert num_layers >= 0, "negative layers?!?"
+        assert 0.0 <= dropout <= 1.0
         if normalization is not None:
             assert callable(normalization), "normalization must be callable"
 
@@ -419,6 +421,7 @@ class MLP(torch.nn.Module):
             if normalization is not None:
                 layers.append(normalization())
             layers.append(torch.nn.ReLU())
+            layers.append(torch.nn.Dropout(1.0 - dropout))
             prev_dim = hidden_dim
 
         layers.append(torch.nn.Linear(hidden_dim, output_dim))

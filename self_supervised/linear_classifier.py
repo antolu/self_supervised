@@ -63,7 +63,9 @@ class LinearClassifierMethod(pl.LightningModule):
         self.dataset = utils.get_class_dataset(hparams.dataset_name)
 
         # self.classifier = torch.nn.Linear(hparams.embedding_dim, self.dataset.num_classes)
-        self.classifier = utils.MLP(hparams.embedding_dim, self.dataset.num_classes, 2048, 2)
+        self.classifier = utils.MLP(hparams.embedding_dim,
+                                    self.dataset.num_classes, 2048, 2,
+                                    dropout=0.8)
 
     def load_model_from_checkpoint(self, checkpoint_path: str):
         checkpoint = torch.load(checkpoint_path)
