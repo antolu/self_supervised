@@ -1,15 +1,19 @@
 import math
-from typing import Dict
+from typing import Dict, Optional
+import logging
 
 import attr
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from pytorch_lightning.utilities import AttributeDict
-from torch.utils.data import DataLoader
 from sklearn.metrics import classification_report
+from torch.utils.data import DataLoader
 
 from . import utils
+
+
+log = logging.getLogger(__name__)
 
 
 @attr.s(auto_attribs=True)
@@ -45,9 +49,9 @@ class LinearClassifierMethod(pl.LightningModule):
     hparams: AttributeDict
 
     def __init__(
-        self,
-        hparams: LinearClassifierMethodParams = None,
-        **kwargs,
+            self,
+            hparams: LinearClassifierMethodParams = None,
+            **kwargs,
     ):
         super().__init__()
 
@@ -70,7 +74,9 @@ class LinearClassifierMethod(pl.LightningModule):
 
         self.dataset = utils.get_class_dataset(hparams.dataset_name)
 
-        self.classifier = torch.nn.Linear(hparams.embedding_dim, self.dataset.num_classes)
+        self.classifier = torch.nn.Linear(hparams.embedding_dim,
+                                          self.dataset.num_classes)
+        self.temperature = torch.nn.Parameter(torch.ones(1))
 
     def load_model_from_checkpoint(self, checkpoint_path: str):
         checkpoint = torch.load(checkpoint_path)
@@ -80,10 +86,25 @@ class LinearClassifierMethod(pl.LightningModule):
                 del state_dict[k]
         self.load_state_dict(state_dict, strict=False)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         with torch.no_grad():
             embedding = self.model(x)
-        return self.classifier(embedding)
+
+        logits = self.classifier(embedding)
+
+        with torch.no_grad():
+            temp_scaled_logits = self.temperature_scale(logits)
+
+        return temp_scaled_logits
+
+    def temperature_scale(self, logits: torch.Tensor):
+        """
+        Perform temperature scaling on logits
+        """
+        # Expand temperature to match the size of logits
+        temperature = self.temperature.unsqueeze(1).expand(logits.size(0),
+                                                           logits.size(1))
+        return logits / temperature
 
     def training_step(self, batch, batch_idx, **kwargs):
         x, y = batch
@@ -111,7 +132,8 @@ class LinearClassifierMethod(pl.LightningModule):
         avg_loss = torch.stack([x["valid_loss"] for x in outputs]).mean()
         avg_acc1 = torch.stack([x["valid_acc1"] for x in outputs]).mean()
         labels = torch.cat([x['labels'] for x in outputs]).cpu().numpy()
-        predictions = torch.cat([x['predictions'] for x in outputs]).cpu().numpy()
+        predictions = torch.cat(
+            [x['predictions'] for x in outputs]).cpu().numpy()
         # avg_acc5 = torch.stack([x["valid_acc5"] for x in outputs]).mean()
 
         report = classification_report(labels, predictions, output_dict=True,
@@ -139,8 +161,10 @@ class LinearClassifierMethod(pl.LightningModule):
             momentum=self.hparams.momentum,
             weight_decay=self.hparams.weight_decay,
         )
-        milestones = [math.floor(self.hparams.max_epochs * 0.6), math.floor(self.hparams.max_epochs * 0.8)]
-        self.lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones)
+        milestones = [math.floor(self.hparams.max_epochs * 0.6),
+                      math.floor(self.hparams.max_epochs * 0.8)]
+        self.lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
+                                                                 milestones)
         return [optimizer], [self.lr_scheduler]
 
     def train_dataloader(self):
@@ -180,3 +204,109 @@ class LinearClassifierMethod(pl.LightningModule):
         model = cls(params)
         model.load_model_from_checkpoint(checkpoint_path)
         return model
+
+    def set_temperature(self, valid_loader: Optional[DataLoader] = None):
+        """
+        Tune the temperature of the model (using the validation set).
+        We're going to set it to optimize NLL.
+        valid_loader (DataLoader): validation set loader
+        """
+        if valid_loader is None:
+            valid_loader = self.val_dataloader()
+
+        nll_criterion = torch.nn.CrossEntropyLoss()
+        ece_criterion = _ECELoss()
+
+        # First: collect all the logits and labels for the validation set
+        logits_list = []
+        labels_list = []
+        with torch.no_grad():
+            for input_, label in valid_loader:
+                input_, label = input_.to(self.device), label.to(self.device)
+
+                logits = self.model(input_)
+
+                logits_list.append(logits)
+                labels_list.append(label)
+
+            logits = torch.cat(logits_list).to(self.device)
+            labels = torch.cat(labels_list).to(self.device)
+
+        # Calculate NLL and ECE before temperature scaling
+        before_temperature_nll = nll_criterion(logits, labels).item()
+        before_temperature_ece = ece_criterion(logits, labels).item()
+
+        log.info('Before temperature - NLL: {:.3f}, ECE: {:.3f}'.format(
+            before_temperature_nll, before_temperature_ece))
+
+        # Next: optimize the temperature w.r.t. NLL
+        optimizer = torch.optim.LBFGS([self.temperature], lr=0.01, max_iter=50)
+
+        def eval():
+            optimizer.zero_grad()
+            loss = nll_criterion(self.temperature_scale(logits), labels)
+            loss.backward()
+            return loss
+
+        optimizer.step(eval)
+
+        # Calculate NLL and ECE after temperature scaling
+        after_temperature_nll = nll_criterion(self.temperature_scale(logits),
+                                              labels).item()
+        after_temperature_ece = ece_criterion(self.temperature_scale(logits),
+                                              labels).item()
+        log.info('Optimal temperature: {:.3f}'.format(self.temperature.item()))
+        log.info('After temperature - NLL: {:.3f}, ECE: {:.3f}'.format(
+            after_temperature_nll, after_temperature_ece))
+
+        return self
+
+
+class _ECELoss(torch.nn.Module):
+    """
+    Calculates the Expected Calibration Error of a model.
+    (This isn't necessary for temperature scaling, just a cool metric).
+
+    The input to this loss is the logits of a model, NOT the softmax scores.
+
+    This divides the confidence outputs into equally-sized interval bins.
+    In each bin, we compute the confidence gap:
+
+    bin_gap = | avg_confidence_in_bin - accuracy_in_bin |
+
+    We then return a weighted average of the gaps, based on the number
+    of samples in each bin
+
+    See: Naeini, Mahdi Pakdaman, Gregory F. Cooper, and Milos Hauskrecht.
+    "Obtaining Well Calibrated Probabilities Using Bayesian Binning." AAAI.
+    2015.
+    """
+
+    def __init__(self, n_bins: int = 15):
+        """
+        n_bins (int): number of confidence interval bins
+        """
+        super(_ECELoss, self).__init__()
+        bin_boundaries = torch.linspace(0, 1, n_bins + 1)
+        self.bin_lowers = bin_boundaries[:-1]
+        self.bin_uppers = bin_boundaries[1:]
+
+    def forward(self, logits: torch.Tensor,
+                labels: torch.Tensor) -> torch.Tensor:
+        softmaxes = F.softmax(logits, dim=1)
+        confidences, predictions = torch.max(softmaxes, 1)
+        accuracies = predictions.eq(labels)
+
+        ece = torch.zeros(1, device=logits.device)
+        for bin_lower, bin_upper in zip(self.bin_lowers, self.bin_uppers):
+            # Calculated |confidence - accuracy| in each bin
+            in_bin = confidences.gt(bin_lower.item()) \
+                     * confidences.le(bin_upper.item())
+            prop_in_bin = in_bin.float().mean()
+            if prop_in_bin.item() > 0:
+                accuracy_in_bin = accuracies[in_bin].float().mean()
+                avg_confidence_in_bin = confidences[in_bin].mean()
+                ece += torch.abs(
+                    avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
+
+        return ece
