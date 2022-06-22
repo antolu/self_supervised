@@ -88,7 +88,7 @@ class LinearClassifierMethod(pl.LightningModule):
     def training_step(self, batch, batch_idx, **kwargs):
         x, y = batch
         y_hat = self.forward(x)
-        loss = F.cross_entropy(y_hat, y)
+        loss = F.cross_entropy(y_hat, y, weight=self.class_weights)
         acc1 = utils.calculate_accuracy(y_hat, y, topk=(1,))
 
         log_data = {"step_train_loss": loss, "step_train_acc1": acc1[0]}
@@ -100,7 +100,7 @@ class LinearClassifierMethod(pl.LightningModule):
         y_hat = self.forward(x)
         acc1 = utils.calculate_accuracy(y_hat, y, topk=(1,))
         return {
-            "valid_loss": F.cross_entropy(y_hat, y),
+            "valid_loss": F.cross_entropy(y_hat, y, weight=self.class_weights),
             "valid_acc1": acc1[0],
             'predictions': torch.max(y_hat, dim=1)[1],
             'labels': y,
@@ -114,7 +114,8 @@ class LinearClassifierMethod(pl.LightningModule):
         predictions = torch.cat([x['predictions'] for x in outputs]).cpu().numpy()
         # avg_acc5 = torch.stack([x["valid_acc5"] for x in outputs]).mean()
 
-        report = classification_report(labels, predictions, output_dict=True)
+        report = classification_report(labels, predictions, output_dict=True,
+                                       zero_division=0)
         report_data = {}
         for cls, data in {k: v
                           for k, v in report.items()
