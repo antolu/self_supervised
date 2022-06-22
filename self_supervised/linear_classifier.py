@@ -1,4 +1,5 @@
 import math
+from typing import Dict
 
 import attr
 import pytorch_lightning as pl
@@ -35,6 +36,8 @@ class LinearClassifierMethodParams:
 
     pretrained: bool = False
 
+    class_weight: Dict[int, float] = {}
+
 
 class LinearClassifierMethod(pl.LightningModule):
     model: torch.nn.Module
@@ -54,6 +57,11 @@ class LinearClassifierMethod(pl.LightningModule):
             hparams = self.params(**hparams, **kwargs)
 
         self.hparams.update(attr.asdict(hparams))
+
+        class_weights = [i if i not in self.hparams.class_weights
+                         else self.hparams.class_weights[i]
+                         for i in range(self.dataset.num_classes)]
+        self.class_weights = torch.Tensor(class_weights)
 
         # actually do a load that is a little more flexible
         self.model = utils.get_encoder(hparams.encoder_arch,
