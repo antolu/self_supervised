@@ -62,11 +62,6 @@ class LinearClassifierMethod(pl.LightningModule):
 
         self.hparams.update(attr.asdict(hparams))
 
-        class_weights = [i if i not in self.hparams.class_weights
-                         else self.hparams.class_weights[i]
-                         for i in range(self.dataset.num_classes)]
-        self.class_weights = torch.Tensor(class_weights)
-
         # actually do a load that is a little more flexible
         self.model = utils.get_encoder(hparams.encoder_arch,
                                        hparams.dataset_name,
@@ -80,6 +75,11 @@ class LinearClassifierMethod(pl.LightningModule):
                                     dropout=0.8)
 
         self.temperature = torch.nn.Parameter(torch.ones(1))
+
+        class_weights = [i if i not in self.hparams.class_weights
+                         else self.hparams.class_weights[i]
+                         for i in range(self.dataset.num_classes)]
+        self.class_weights = torch.Tensor(class_weights)
 
     def load_model_from_checkpoint(self, checkpoint_path: str):
         checkpoint = torch.load(checkpoint_path)
