@@ -74,8 +74,11 @@ class LinearClassifierMethod(pl.LightningModule):
 
         self.dataset = utils.get_class_dataset(hparams.dataset_name)
 
-        self.classifier = torch.nn.Linear(hparams.embedding_dim,
-                                          self.dataset.num_classes)
+        # self.classifier = torch.nn.Linear(hparams.embedding_dim, self.dataset.num_classes)
+        self.classifier = utils.MLP(hparams.embedding_dim,
+                                    self.dataset.num_classes, 2048, 2,
+                                    dropout=0.8)
+
         self.temperature = torch.nn.Parameter(torch.ones(1))
 
     def load_model_from_checkpoint(self, checkpoint_path: str):
@@ -191,18 +194,44 @@ class LinearClassifierMethod(pl.LightningModule):
         return LinearClassifierMethodParams(**kwargs)
 
     @classmethod
-    def from_moco_checkpoint(cls, checkpoint_path, **kwargs):
+    def from_moco_checkpoint(cls, checkpoint_path,
+                             use_moco_hparams: bool = False, **kwargs):
         """ Loads hyperparameters and model from moco checkpoint """
         checkpoint = torch.load(checkpoint_path)
         moco_hparams = checkpoint["hyper_parameters"]
+
+        if not use_moco_hparams:
+            moco_hparams = {k: moco_hparams[k] for k in ('encoder_arch',
+                                                         'embedding_dim',
+                                                         'dataset_name')}
         params = cls.params(
-            encoder_arch=moco_hparams["encoder_arch"],
-            embedding_dim=moco_hparams["embedding_dim"],
-            dataset_name=moco_hparams["dataset_name"],
+            **moco_hparams,
             **kwargs,
         )
         model = cls(params)
         model.load_model_from_checkpoint(checkpoint_path)
+        return model
+
+    @classmethod
+    def from_trained_checkpoint(cls, checkpoint_path: str, **kwargs):
+        checkpoint = torch.load(checkpoint_path)
+        moco_hparams = checkpoint["hyper_parameters"]
+
+        moco_hparams = {k: moco_hparams[k] for k in ('encoder_arch',
+                                                     'embedding_dim',
+                                                     'dataset_name')}
+        params = cls.params(
+            **moco_hparams,
+            **kwargs,
+        )
+        model = cls(params)
+
+        state_dict = checkpoint['state_dict']
+        for k in list(state_dict.keys()):
+            if not (k.startswith('model.') or k.startswith('classifier.')):
+                del state_dict[k]
+
+        model.load_state_dict(state_dict, strict=False)
         return model
 
     def set_temperature(self, valid_loader: Optional[DataLoader] = None):
