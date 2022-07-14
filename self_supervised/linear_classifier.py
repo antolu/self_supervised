@@ -76,10 +76,10 @@ class LinearClassifierMethod(pl.LightningModule):
 
         self.temperature = torch.nn.Parameter(torch.ones(1))
 
-        class_weights = [i if i not in self.hparams.class_weights
-                         else self.hparams.class_weights[i]
-                         for i in range(self.dataset.num_classes)]
-        self.class_weights = torch.Tensor(class_weights)
+        class_weight = [1 if i not in self.hparams.class_weight
+                        else self.hparams.class_weight[i]
+                        for i in range(self.dataset.num_classes)]
+        self.class_weight = torch.Tensor(class_weight)
 
     def load_model_from_checkpoint(self, checkpoint_path: str):
         checkpoint = torch.load(checkpoint_path)
@@ -112,7 +112,7 @@ class LinearClassifierMethod(pl.LightningModule):
     def training_step(self, batch, batch_idx, **kwargs):
         x, y = batch
         y_hat = self.forward(x)
-        loss = F.cross_entropy(y_hat, y, weight=self.class_weights)
+        loss = F.cross_entropy(y_hat, y, weight=self.class_weight)
         acc1 = utils.calculate_accuracy(y_hat, y, topk=(1,))
 
         log_data = {"step_train_loss": loss, "step_train_acc1": acc1[0]}
@@ -124,7 +124,7 @@ class LinearClassifierMethod(pl.LightningModule):
         y_hat = self.forward(x)
         acc1 = utils.calculate_accuracy(y_hat, y, topk=(1,))
         return {
-            "valid_loss": F.cross_entropy(y_hat, y, weight=self.class_weights),
+            "valid_loss": F.cross_entropy(y_hat, y, weight=self.class_weight),
             "valid_acc1": acc1[0],
             'predictions': torch.max(y_hat, dim=1)[1],
             'labels': y,
